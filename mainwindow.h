@@ -5,6 +5,11 @@
 #include <QObject>
 #include <QtWidgets>
 #include <QTableWidgetItem>
+
+#include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QtSql>
+
 #include "plus_music.h"
 
 struct music
@@ -30,6 +35,8 @@ public:
     ~MainWindow();
     QVector<music> Musics;
     plus_music *PM;
+    QSqlDatabase db;
+    //QSqlQuery *A;
     int Irow;
 
 private slots:
