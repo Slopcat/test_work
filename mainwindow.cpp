@@ -12,9 +12,15 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
     QString sAppDir=QApplication::applicationDirPath();
     PM=new plus_music();
-    Musics.clear();
+    ML=new QStandardItemModel();
+    ML->clear();
+    ML->setColumnCount(4);
+    ui->tableView->setModel(ML);
     Irow=-1;
-    ui->tableWidget->horizontalHeader()->setVisible(true);
+    ui->tableView->horizontalHeader()->setVisible(true);
+    ui->tableView->verticalHeader()->setVisible(false);
+    QStringList labels = QObject::trUtf8("Превью альбома,Название,Исполнитель,Продолжительность").simplified().split(",");
+    ML->setHorizontalHeaderLabels(labels);
     sAppDir.replace("\\", "/");
     sAppDir+="/music.db.sqlite";
     db = QSqlDatabase::addDatabase("QSQLITE");
@@ -47,43 +53,49 @@ MainWindow::MainWindow(QWidget *parent) :
         {
             music a;
             QPixmap     icon;
-            QTableWidgetItem* ptwi;
-            int k=0;
+            QStandardItem* ptwi;
+            //int k=0;
             while(query.next())
             {
-                k=ui->tableWidget->rowCount();
-                ui->tableWidget->setRowCount(ui->tableWidget->rowCount()+1);
-                ptwi= new QTableWidgetItem();
-                if (!icon.load(query.value(0).toString()))
-                {
-                    a.icon="";
-                    ptwi->setData(Qt::DecorationRole,QIcon(":/resources/no_logo.png"));
-                }
-                else
-                {
-                    a.icon=query.value(0).toString();
-                    ptwi->setData(Qt::DecorationRole,QIcon(icon));
-                }
+                QList<QStandardItem *> items;
+                a.icon=query.value(0).toString();
                 a.name=query.value(1).toString();
                 a.executor=query.value(2).toString();
                 a.time=query.value(3).toUInt();
                 a.star = query.value(4).toInt();
+                ptwi= new QStandardItem();
+                a.icon=query.value(0).toString();
+                if (!icon.load(query.value(0).toString()))
+                {
+                    a.icon="";
+                    icon.load(":/resources/no_logo.png");
+                }
+                else
+                {
+                    a.icon=query.value(0).toString();
+                }
+                ptwi->setData(QIcon(icon),Qt::DecorationRole);
+                ptwi->setData(a.icon,      musllist::iconstrRole);
+                ptwi->setData(a.name,     musllist::nameRole);
+                ptwi->setData(a.executor, musllist::executorRole);
+                ptwi->setData(a.time,   musllist::timeRole);
+                ptwi->setData(a.star,                  musllist::startRole);
                 ptwi->setFlags(ptwi->flags() ^ Qt::ItemIsEditable);
-                ptwi->setToolTip(QString("star: %1").arg(a.star));
-                ui->tableWidget->setItem(k,0,ptwi);
-                ptwi= new QTableWidgetItem();ptwi->setText(a.name);
+                ptwi->setData(QString("star: %1").arg(a.star),Qt::ToolTipRole);
+                items.append(ptwi);
+                ptwi= new QStandardItem();ptwi->setText(a.name);
                 ptwi->setFlags(ptwi->flags() ^ Qt::ItemIsEditable);
-                ptwi->setToolTip(QString("star: %1").arg(a.star));
-                ui->tableWidget->setItem(k,1,ptwi);
-                ptwi= new QTableWidgetItem(a.executor);
+                ptwi->setData(QString("star: %1").arg(a.star),Qt::ToolTipRole);
+                items.append(ptwi);
+                ptwi= new QStandardItem(a.executor);
                 ptwi->setFlags(ptwi->flags() ^ Qt::ItemIsEditable);
-                ptwi->setToolTip(QString("star: %1").arg(a.star));
-                ui->tableWidget->setItem(k,2,ptwi);
-                ptwi= new QTableWidgetItem(QDateTime::fromTime_t(a.time).toUTC().toString("hh:mm:ss"));
+                ptwi->setData(QString("star: %1").arg(a.star),Qt::ToolTipRole);
+                items.append(ptwi);
+                ptwi= new QStandardItem(QDateTime::fromTime_t(a.time).toUTC().toString("hh:mm:ss"));
                 ptwi->setFlags(ptwi->flags() ^ Qt::ItemIsEditable);
-                ptwi->setToolTip(QString("star: %1").arg(a.star));
-                ui->tableWidget->setItem(k,3,ptwi);
-                Musics.append(a);
+                ptwi->setData(QString("star: %1").arg(a.star),Qt::ToolTipRole);
+                items.append(ptwi);
+                ML->appendRow(items);
             }
 
         }
@@ -93,21 +105,19 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(PM,SIGNAL(NewMusic(QString,QString,QString,uint)),this,SLOT(nEWmUSIC(QString,QString,QString,uint)));
 }
-// A->exec(QString("INSERT INTO DIVIZ (idname,nname,XXX,YYY,RRR,CCC,ebal) VALUES('%1','%2',%3,%4,%5,%6,%7);").arg(trashdiv).arg(a).arg(X).arg(Y).arg(R).arg(C).arg(david));
-
 
 MainWindow::~MainWindow()
 {
     QSqlQuery query(db);
     query.exec("DELETE FROM playlist");
-    for (int var = 0; var < Musics.count(); var++)
+    for (int var = 0; var <ML->rowCount(); var++)//ML->item(var,0)->data()
     {
         query.prepare("INSERT INTO playlist (icon,name,executor,time,star) VALUES (?, ?, ?, ?, ?)");
-        query.addBindValue(Musics[var].icon);
-        query.addBindValue(Musics[var].name);
-        query.addBindValue(Musics[var].executor);
-        query.addBindValue(Musics[var].time);
-        query.addBindValue(Musics[var].star);
+        query.addBindValue(ML->item(var,0)->data(musllist::iconstrRole).toString());
+        query.addBindValue(ML->item(var,0)->data(musllist::nameRole).toString());
+        query.addBindValue(ML->item(var,0)->data(musllist::executorRole).toString());
+        query.addBindValue(ML->item(var,0)->data(musllist::timeRole).toUInt());
+        query.addBindValue(ML->item(var,0)->data(musllist::startRole).toInt());
         qDebug()<<query.exec();
     }
     db.close();
@@ -118,10 +128,8 @@ MainWindow::~MainWindow()
 void MainWindow::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
-    ui->tableWidget->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
-    ui->tableWidget->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
-    ui->tableWidget->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
-    ui->tableWidget->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch);
+    ui->tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+
 }
 
 
@@ -135,77 +143,77 @@ void MainWindow::nEWmUSIC(QString PNG,QString NAME,QString EX,uint t)
 {
     music a;
     QPixmap     icon;
-    QTableWidgetItem* ptwi;
+    QStandardItem* ptwi;
     if(Irow==-1)
     {
-        int k=0;
-        k=ui->tableWidget->rowCount();
-        ui->tableWidget->setRowCount(ui->tableWidget->rowCount()+1);
-        ptwi= new QTableWidgetItem();
+        QList<QStandardItem *> items;
+        ptwi= new QStandardItem();
         if (!icon.load(PNG))
         {
             a.icon="";
-            ptwi->setData(Qt::DecorationRole,QIcon(":/resources/no_logo.png"));
+            icon.load(":/resources/no_logo.png");
         }
         else
         {
             a.icon=PNG;
-            ptwi->setData(Qt::DecorationRole,QIcon(icon));
         }
-
         a.name=NAME;
         a.executor=EX;
         a.time=t;
         a.star = (QRandomGenerator::global()->generate())%6;
         qDebug()<<"star="<<a.star;
+        ptwi->setData(QIcon(icon),Qt::DecorationRole);
+        ptwi->setData(a.icon,      musllist::iconstrRole);
+        ptwi->setData(a.name,     musllist::nameRole);
+        ptwi->setData(a.executor, musllist::executorRole);
+        ptwi->setData(a.time,   musllist::timeRole);
+        ptwi->setData(a.star,                  musllist::startRole);
         ptwi->setFlags(ptwi->flags() ^ Qt::ItemIsEditable);
-        ptwi->setToolTip(QString("star: %1").arg(a.star));
-        ui->tableWidget->setItem(k,0,ptwi);
-        ptwi= new QTableWidgetItem();ptwi->setText(a.name);
+        ptwi->setData(QString("star: %1").arg(a.star),Qt::ToolTipRole);
+        items.append(ptwi);
+        ptwi= new QStandardItem();ptwi->setText(a.name);
         ptwi->setFlags(ptwi->flags() ^ Qt::ItemIsEditable);
-        ptwi->setToolTip(QString("star: %1").arg(a.star));
-        ui->tableWidget->setItem(k,1,ptwi);
-        ptwi= new QTableWidgetItem(a.executor);
+        ptwi->setData(QString("star: %1").arg(a.star),Qt::ToolTipRole);
+        items.append(ptwi);
+        ptwi= new QStandardItem(a.executor);
         ptwi->setFlags(ptwi->flags() ^ Qt::ItemIsEditable);
-        ptwi->setToolTip(QString("star: %1").arg(a.star));
-        ui->tableWidget->setItem(k,2,ptwi);
-        ptwi= new QTableWidgetItem(QDateTime::fromTime_t(a.time).toUTC().toString("hh:mm:ss"));
+        ptwi->setData(QString("star: %1").arg(a.star),Qt::ToolTipRole);
+        items.append(ptwi);
+        ptwi= new QStandardItem(QDateTime::fromTime_t(a.time).toUTC().toString("hh:mm:ss"));
         ptwi->setFlags(ptwi->flags() ^ Qt::ItemIsEditable);
-        ptwi->setToolTip(QString("star: %1").arg(a.star));
-        ui->tableWidget->setItem(k,3,ptwi);
-        Musics.append(a);
+        ptwi->setData(QString("star: %1").arg(a.star),Qt::ToolTipRole);
+        items.append(ptwi);
+        ML->appendRow(items);
+
     }
     else
     {
+        ptwi = ML->item(Irow,0);
+        a.name=NAME;
+        a.executor=EX;
+        a.time=t;
         if(PNG!="")
         {
             if (icon.load(PNG))
             {
-                Musics[Irow].icon=PNG;
-                ptwi= new QTableWidgetItem();ptwi->setData(Qt::DecorationRole, QIcon(icon));
-                ptwi->setFlags(ptwi->flags() ^ Qt::ItemIsEditable);
-                ptwi->setToolTip(QString("star: %1").arg(Musics[Irow].star));
-                ui->tableWidget->setItem(Irow,0,ptwi);
+                a.icon=PNG;
+                ptwi->setData(QIcon(icon),Qt::DecorationRole);
+
             }
         }
-        Musics[Irow].name=NAME;
-        Musics[Irow].executor=EX;
-        Musics[Irow].time=t;
-        ptwi= new QTableWidgetItem();ptwi->setText(Musics[Irow].name);
-        ptwi->setFlags(ptwi->flags() ^ Qt::ItemIsEditable);
-        ptwi->setToolTip(QString("star: %1").arg(Musics[Irow].star));
-        ui->tableWidget->setItem(Irow,1,ptwi);
-        ptwi= new QTableWidgetItem(Musics[Irow].executor);
-        ptwi->setFlags(ptwi->flags() ^ Qt::ItemIsEditable);
-        ptwi->setToolTip(QString("star: %1").arg(Musics[Irow].star));
-        ui->tableWidget->setItem(Irow,2,ptwi);
-        ptwi= new QTableWidgetItem(QDateTime::fromTime_t(Musics[Irow].time).toUTC().toString("hh:mm:ss"));
-        ptwi->setFlags(ptwi->flags() ^ Qt::ItemIsEditable);
-        ptwi->setToolTip(QString("star: %1").arg(Musics[Irow].star));
-        ui->tableWidget->setItem(Irow,3,ptwi);
+        ptwi->setData(a.icon,      musllist::iconstrRole);
+        ptwi->setData(a.name,     musllist::nameRole);
+        ptwi->setData(a.executor, musllist::executorRole);
+        ptwi->setData(a.time,   musllist::timeRole);
 
+        ptwi = ML->item(Irow,1);
+        ptwi->setText(a.name);
 
+        ptwi= ML->item(Irow,2);
+        ptwi->setText(a.executor);
 
+        ptwi= ML->item(Irow,3);
+        ptwi->setText(QDateTime::fromTime_t(a.time).toUTC().toString("hh:mm:ss"));
 
     }
     Irow=-1;
@@ -215,6 +223,18 @@ void MainWindow::nEWmUSIC(QString PNG,QString NAME,QString EX,uint t)
 
 void MainWindow::Order()
 {
+    QVector<music> Musics;
+    for (int var = 0; var < ML->rowCount(); var++)
+    {
+        music b;
+        b.icon=ML->item(var,0)->data(musllist::iconstrRole).toString();
+        b.name=ML->item(var,0)->data(musllist::nameRole).toString();
+        b.executor=ML->item(var,0)->data(musllist::executorRole).toString();
+        b.time=ML->item(var,0)->data(musllist::timeRole).toUInt();
+        b.star= ML->item(var,0)->data(musllist::startRole).toInt();
+        Musics.push_back(b);
+    }
+
     for (int i = 1; i < Musics.count(); i++)
     {
 
@@ -230,44 +250,38 @@ void MainWindow::Order()
             }
         }
     }
-    QPixmap     icon;
-    QTableWidgetItem* ptwi;
+    QStandardItem* ptwi;
     for (int var = 0; var < Musics.count(); var++)
     {
         qDebug()<<"star="<<Musics[var].star;
-        ptwi= new QTableWidgetItem();
-        if(Musics[var].icon!="")
+        QPixmap     icon;
+        ptwi = ML->item(var,0);
+        if (!icon.load(Musics[var].icon))
         {
-            if (icon.load(Musics[var].icon))
-            {
-                ptwi->setData(Qt::DecorationRole, QIcon(icon));
-            }
-            else
-            {
-                ptwi->setData(Qt::DecorationRole,QIcon(":/resources/no_logo.png"));
-            }
+            Musics[var].icon="";
+            icon.load(":/resources/no_logo.png");
         }
-        else
-        {
-            ptwi->setData(Qt::DecorationRole,QIcon(":/resources/no_logo.png"));
+        ptwi->setData(QIcon(icon),Qt::DecorationRole);
+        ptwi->setData(Musics[var].icon,      musllist::iconstrRole);
+        ptwi->setData(Musics[var].name,     musllist::nameRole);
+        ptwi->setData(Musics[var].executor, musllist::executorRole);
+        ptwi->setData(Musics[var].time,   musllist::timeRole);
+        ptwi->setData(Musics[var].star,                  musllist::startRole);
 
-        }
-        ptwi->setFlags(ptwi->flags() ^ Qt::ItemIsEditable);
-        ptwi->setToolTip(QString("star: %1").arg(Musics[var].star));
-        ui->tableWidget->setItem(var,0,ptwi);
-        ptwi= new QTableWidgetItem();ptwi->setText(Musics[var].name);
-        ptwi->setFlags(ptwi->flags() ^ Qt::ItemIsEditable);
-        ptwi->setToolTip(QString("star: %1").arg(Musics[var].star));
-        ui->tableWidget->setItem(var,1,ptwi);
-        ptwi= new QTableWidgetItem(Musics[var].executor);
-        ptwi->setFlags(ptwi->flags() ^ Qt::ItemIsEditable);
-        ptwi->setToolTip(QString("star: %1").arg(Musics[var].star));
-        ui->tableWidget->setItem(var,2,ptwi);
-        ptwi= new QTableWidgetItem(QDateTime::fromTime_t(Musics[var].time).toUTC().toString("hh:mm:ss"));
-        ptwi->setFlags(ptwi->flags() ^ Qt::ItemIsEditable);
-        ptwi->setToolTip(QString("star: %1").arg(Musics[var].star));
-        ui->tableWidget->setItem(var,3,ptwi);
+        ptwi = ML->item(var,1);
+        ptwi->setText(Musics[var].name);
+        ptwi->setData(QString("star: %1").arg(Musics[var].star),Qt::ToolTipRole);
+
+        ptwi= ML->item(var,2);
+        ptwi->setText(Musics[var].executor);
+        ptwi->setData(QString("star: %1").arg(Musics[var].star),Qt::ToolTipRole);
+
+        ptwi= ML->item(var,3);
+        ptwi->setText(QDateTime::fromTime_t(Musics[var].time).toUTC().toString("hh:mm:ss"));
+        ptwi->setData(QString("star: %1").arg(Musics[var].star),Qt::ToolTipRole);
     }
+     QModelIndex idx1=ML->item(0,0)->index(),idx2=ML->item(ML->rowCount()-1,ML->columnCount()-1)->index();
+     ML->dataChanged(idx1,idx2);
 }
 
 
@@ -278,7 +292,9 @@ void MainWindow::on_Edit_Button_clicked()
     if(Irow>=0)
     {
         PM->CLEAR();
-        PM->Edit_Music(Musics[Irow].name,Musics[Irow].executor,Musics[Irow].time);
+        PM->Edit_Music(ML->item(Irow,0)->data(musllist::nameRole).toString(),
+                       ML->item(Irow,0)->data(musllist::executorRole).toString(),
+                       ML->item(Irow,0)->data(musllist::timeRole).toUInt());
         PM->show();
     }
     else
@@ -288,15 +304,15 @@ void MainWindow::on_Edit_Button_clicked()
 }
 
 
-void MainWindow::on_tableWidget_cellClicked(int row, int column)
-{
-    Irow=row;
-    qDebug()<<row<<"  "<<column;
-}
-
 
 void MainWindow::on_Sort_Button_clicked()
 {
     Order();
 }
 
+
+void MainWindow::on_tableView_clicked(const QModelIndex &index)
+{
+    Irow=index.row();
+    qDebug()<<index.row()<<"  "<<index.column();
+}

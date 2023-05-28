@@ -1,8 +1,6 @@
 #include "plus_music.h"
 #include "ui_plus_music.h"
-#include <QFileDialog>
-#include <QDebug>
-#include <QMessageBox>
+
 
 
 plus_music::plus_music(QWidget *parent) :

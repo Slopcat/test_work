@@ -9,16 +9,34 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QtSql>
+#include <QDebug>
+#include <QMessageBox>
 
 #include "plus_music.h"
+#include "ui_mainwindow.h"
 
+
+namespace musllist
+{
+   enum eRoles
+   {
+      iconstrRole     = Qt::UserRole + 101,
+      nameRole     = Qt::UserRole + 102,
+      executorRole     = Qt::UserRole + 103,
+      timeRole      = Qt::UserRole + 104,
+      startRole    = Qt::UserRole + 105,
+      noRole
+   };
+}
 struct music
 {
     QString icon;
     QString name;
     QString executor;
     uint    time;
-    int star;
+    int    star;
+    music(): icon(""),name(""),executor(""),time(0),star(0){}
+    music(QString PNG,QString NAME,QString EX,uint t,int s): icon(PNG),name(NAME),executor(EX),time(t),star(s){}
 
 };
 
@@ -33,10 +51,10 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
-    QVector<music> Musics;
+
     plus_music *PM;
     QSqlDatabase db;
-    //QSqlQuery *A;
+    QStandardItemModel *ML;
     int Irow;
 
 private slots:
@@ -44,13 +62,11 @@ private slots:
     void on_Create_Button_clicked();
     void nEWmUSIC(QString,QString,QString,uint);
     void on_Edit_Button_clicked();
-    void on_tableWidget_cellClicked(int row, int column);
     void Order();
-
     void on_Sort_Button_clicked();
+    void on_tableView_clicked(const QModelIndex &index);
 
 signals:
-    void otvet(bool);
 
 private:
     Ui::MainWindow *ui;

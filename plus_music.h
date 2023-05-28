@@ -2,6 +2,10 @@
 #define PLUS_MUSIC_H
 
 #include <QWidget>
+#include <QFileDialog>
+#include <QDebug>
+#include <QMessageBox>
+#include <QDateTime>
 
 namespace Ui {
 class plus_music;
